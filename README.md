@@ -47,7 +47,7 @@ CheeseDog is a **full-stack quant trading terminal** that fuses multi-source rea
 ## Data Pipeline
 
 ```
-┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+┌───────────────────┐     ┌───────────────────┐     ┌───────────────────┐
 │  Binance          │     │  Polymarket       │     │  Chainlink        │
 │  WebSocket        │     │  CLOB API         │     │  Oracle           │
 │  ───────────────  │     │  ───────────────  │     │  ───────────────  │
@@ -55,25 +55,25 @@ CheeseDog is a **full-stack quant trading terminal** that fuses multi-source rea
 │  • 1m Klines      │     │  • Contract Prices│     │  • On-chain feed  │
 │  • Order Book     │     │  • Spreads        │     │  • Polygon RPC    │
 │  (20 levels)      │     │  (99 levels)      │     │  (persistent TCP) │
-└────────┬─────────┘     └────────┬─────────┘     └────────┬─────────┘
-         │                        │                         │
-         └────────────────────────┼─────────────────────────┘
+└────────┬──────────┘     └─────────┬─────────┘     └─────────┬─────────┘
+         │                          │                         │
+         └──────────────────────────┼─────────────────────────┘
                                   │
-                    ┌─────────────▼──────────────┐
+                    ┌─────────────▼───────────────┐
                     │       MessageBus            │
                     │   (Pub/Sub Event System)    │
                     │   50,000 event queue        │
-                    └─────────────┬──────────────┘
+                    └─────────────┬───────────────┘
                                   │
-              ┌───────────────────┼───────────────────┐
+              ┌───────────────────┼────────────────────┐
               │                   │                    │
-    ┌─────────▼──────┐  ┌────────▼───────┐  ┌────────▼───────┐
-    │  Signal Engine  │  │  Risk Manager  │  │  Smart Router  │
-    │  ────────────── │  │  ──────────── │  │  ──────────── │
-    │  12+ indicators │  │  4 circuit    │  │  Taker (FOK)  │
-    │  Bayesian cal.  │  │  breakers     │  │  Maker (GTC)  │
-    │  Sentiment      │  │  Kelly sizing │  │  EV Filter    │
-    └────────────────┘  └──────────────┘  └──────────────┘
+    ┌─────────▼───────┐  ┌────────▼──────┐  ┌────────▼────────┐
+    │  Signal Engine  │  │  Risk Manager │  │  Smart Router   │
+    │  ────────────── │  │  ──────────── │  │  ────────────── │
+    │  12+ indicators │  │  4 circuit    │  │  Taker (FOK)    │
+    │  Bayesian cal.  │  │  breakers     │  │  Maker (GTC)    │
+    │  Sentiment      │  │  Kelly sizing │  │  EV Filter      │
+    └─────────────────┘  └───────────────┘  └─────────────────┘
 ```
 
 ---
@@ -138,9 +138,9 @@ This prevents the most dangerous backtest-to-live performance gap in prediction 
 
 Implements Polymarket's **exact quadratic fee formula** for 15-minute crypto markets:
 
-| Side | Fee Range | Deducted From |
-|------|----------|---------------|
-| Buy  | 0.2% – 1.6% | Token amount |
+| Side | Fee Range   | Deducted From |
+|------|-------------|---------------|
+| Buy  | 0.2% – 1.6% | Token amount  |
 | Sell | 0.8% – 3.7% | USDC proceeds |
 
 Fee rate scales with contract price deviation from 0.50 (most liquid point). Critical edge case: settlement at $1.00 means the sell-side fee calculation must use `contract_price=1.0`, not the entry price — which changes the fee by up to 3×. See [`examples/fee_model.py`](examples/fee_model.py).
@@ -161,20 +161,20 @@ Fee rate scales with contract price deviation from 0.50 (most liquid point). Cri
 ## API Rate Limit Design
 
 ```
-┌─────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────┐
 │                  Rate Guard Pipeline                 │
 │                                                      │
-│   Market Move?                Token Available?        │
-│   ┌───────────┐     YES     ┌──────────────┐        │
+│   Market Move?                Token Available?       │
+│   ┌───────────┐     YES     ┌──────────────┐         │
 │   │ Deadband   │───────────▸│ Token Bucket  │──▸ API │
 │   │ Filter     │            │ Rate Limiter  │        │
-│   │ Δ < 2%?   │     NO     │ N tx/min      │        │
-│   │ → SKIP    │──── ✗      │ burst: 10     │        │
-│   └───────────┘             └──────────────┘        │
+│   │ Δ < 2%?   │     NO     │ N tx/min       │        │
+│   │ → SKIP    │──── ✗      │ burst: 10      │       │
+│   └───────────┘             └───────────────┘        │
 │                                                      │
 │   Layer 1: Skip if market     Layer 2: Hard rate     │
 │   hasn't moved enough         cap enforcement        │
-└─────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -187,9 +187,9 @@ The `supervisor` module routes AI proposals through a permission gatekeeper befo
 AI Signal / Proposal
         │
         ▼
-┌──────────────────┐
+┌───────────────────┐
 │  AuthorizationGate│  → Mode: AUTO / HITL / MONITOR
-└────────┬─────────┘
+└────────┬──────────┘
          │
     ┌────┴────┐
     ▼         ▼
@@ -273,4 +273,5 @@ This showcase repository contains selected architectural components for demonstr
 The full trading system is maintained in a private repository.
 
 © 2026 CheeseDog (PolyCheese Quant)
+
 
