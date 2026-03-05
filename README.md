@@ -34,9 +34,10 @@ CheeseDog is a **full-stack quant trading terminal** that fuses multi-source rea
 - **Notifications**: `python-telegram-bot` v20+ (HITL remote control)
 
 ### Frontend
-- Vanilla HTML / CSS / JS — real-time dashboard with 18+ live indicators
-- WebSocket push updates for low-latency rendering
-- Supervisor / HITL monitor panel (read-only control plane visualization)
+- React 18 / Vite (Component-based Architecture)
+- Real-time dashboard with 18+ live indicators and WebSocket push updates
+- Phase 2 Tabs: Performance Report, Wind Tunnel Backtest Engine, AI Advice (HITL), Health Status
+- Live Maker Panel with Rate Guard token bucket visualization
 
 ### Testing
 - **122 unit tests** (pytest) covering fees, risk management, signal generation, simulation
@@ -47,7 +48,7 @@ CheeseDog is a **full-stack quant trading terminal** that fuses multi-source rea
 ## Data Pipeline
 
 ```
-┌───────────────────┐     ┌───────────────────┐     ┌───────────────────┐
+┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
 │  Binance          │     │  Polymarket       │     │  Chainlink        │
 │  WebSocket        │     │  CLOB API         │     │  Oracle           │
 │  ───────────────  │     │  ───────────────  │     │  ───────────────  │
@@ -55,25 +56,25 @@ CheeseDog is a **full-stack quant trading terminal** that fuses multi-source rea
 │  • 1m Klines      │     │  • Contract Prices│     │  • On-chain feed  │
 │  • Order Book     │     │  • Spreads        │     │  • Polygon RPC    │
 │  (20 levels)      │     │  (99 levels)      │     │  (persistent TCP) │
-└────────┬──────────┘     └─────────┬─────────┘     └─────────┬─────────┘
-         │                          │                         │
-         └──────────────────────────┼─────────────────────────┘
+└────────┬─────────┘     └────────┬─────────┘     └────────┬─────────┘
+         │                        │                         │
+         └────────────────────────┼─────────────────────────┘
                                   │
-                    ┌─────────────▼───────────────┐
+                    ┌─────────────▼──────────────┐
                     │       MessageBus            │
                     │   (Pub/Sub Event System)    │
                     │   50,000 event queue        │
-                    └─────────────┬───────────────┘
+                    └─────────────┬──────────────┘
                                   │
-              ┌───────────────────┼────────────────────┐
+              ┌───────────────────┼───────────────────┐
               │                   │                    │
-    ┌─────────▼───────┐  ┌────────▼──────┐  ┌────────▼────────┐
-    │  Signal Engine  │  │  Risk Manager │  │  Smart Router   │
-    │  ────────────── │  │  ──────────── │  │  ────────────── │
-    │  12+ indicators │  │  4 circuit    │  │  Taker (FOK)    │
-    │  Bayesian cal.  │  │  breakers     │  │  Maker (GTC)    │
-    │  Sentiment      │  │  Kelly sizing │  │  EV Filter      │
-    └─────────────────┘  └───────────────┘  └─────────────────┘
+    ┌─────────▼──────┐  ┌────────▼───────┐  ┌────────▼───────┐
+    │  Signal Engine  │  │  Risk Manager  │  │  Smart Router  │
+    │  ────────────── │  │  ──────────── │  │  ──────────── │
+    │  12+ indicators │  │  4 circuit    │  │  Taker (FOK)  │
+    │  Bayesian cal.  │  │  breakers     │  │  Maker (GTC)  │
+    │  Sentiment      │  │  Kelly sizing │  │  EV Filter    │
+    └────────────────┘  └──────────────┘  └──────────────┘
 ```
 
 ---
@@ -89,7 +90,10 @@ The composite signal generator fuses **12+ technical indicators** into a single 
 | **Volume** | CVD (1m/3m/5m), Volume Profile POC |
 | **Order Flow** | OBI (Order Book Imbalance), Buy/Sell Walls |
 | **Volatility** | ATR (Average True Range), ADX (Average Directional Index) |
-| **External** | VWAP Deviation, Polymarket Sentiment Factor |
+| **External** | External AI Agent (e.g., OpenClaw) Intervention via Host-Parasite Model |
+
+### Agent-Centric "Host-Parasite" Model
+There is no baked-in AI model (e.g., OpenAI SDK) tying the system down. Instead, CheeseDog provides `/api/llm/` endpoints that expose dense, structural environment data. Any external AI Agent with API-calling capabilities can read the state, perform off-chain sentiment analysis (e.g., parsing Twitter/X for breaking news), and inject strategy proposals back into the system.
 
 ### Market Regime Detection
 - **ADX-based** automatic regime classification: `strong_trend`, `mild_trend`, `ranging`, `choppy`
@@ -138,9 +142,9 @@ This prevents the most dangerous backtest-to-live performance gap in prediction 
 
 Implements Polymarket's **exact quadratic fee formula** for 15-minute crypto markets:
 
-| Side | Fee Range   | Deducted From |
-|------|-------------|---------------|
-| Buy  | 0.2% – 1.6% | Token amount  |
+| Side | Fee Range | Deducted From |
+|------|----------|---------------|
+| Buy  | 0.2% – 1.6% | Token amount |
 | Sell | 0.8% – 3.7% | USDC proceeds |
 
 Fee rate scales with contract price deviation from 0.50 (most liquid point). Critical edge case: settlement at $1.00 means the sell-side fee calculation must use `contract_price=1.0`, not the entry price — which changes the fee by up to 3×. See [`examples/fee_model.py`](examples/fee_model.py).
@@ -161,35 +165,35 @@ Fee rate scales with contract price deviation from 0.50 (most liquid point). Cri
 ## API Rate Limit Design
 
 ```
-┌──────────────────────────────────────────────────────┐
+┌─────────────────────────────────────────────────────┐
 │                  Rate Guard Pipeline                 │
 │                                                      │
-│   Market Move?                Token Available?       │
-│   ┌───────────┐     YES     ┌──────────────┐         │
+│   Market Move?                Token Available?        │
+│   ┌───────────┐     YES     ┌──────────────┐        │
 │   │ Deadband   │───────────▸│ Token Bucket  │──▸ API │
 │   │ Filter     │            │ Rate Limiter  │        │
-│   │ Δ < 2%?   │     NO     │ N tx/min       │        │
-│   │ → SKIP    │──── ✗      │ burst: 10      │       │
-│   └───────────┘             └───────────────┘        │
+│   │ Δ < 2%?   │     NO     │ N tx/min      │        │
+│   │ → SKIP    │──── ✗      │ burst: 10     │        │
+│   └───────────┘             └──────────────┘        │
 │                                                      │
 │   Layer 1: Skip if market     Layer 2: Hard rate     │
 │   hasn't moved enough         cap enforcement        │
-└──────────────────────────────────────────────────────┘
+└─────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## HITL Supervision (Human-in-the-Loop)
 
-The `supervisor` module routes AI proposals through a permission gatekeeper before any execution:
+The `supervisor` module routes proposals from the External AI Agent through a permission gatekeeper before any execution:
 
 ```
-AI Signal / Proposal
+External Agent Signal
         │
         ▼
-┌───────────────────┐
+┌──────────────────┐
 │  AuthorizationGate│  → Mode: AUTO / HITL / MONITOR
-└────────┬──────────┘
+└────────┬─────────┘
          │
     ┌────┴────┐
     ▼         ▼
@@ -257,8 +261,8 @@ Real-time monitoring dashboard featuring:
 |-------|--------|-------|
 | Phase 1–4 | ✅ Complete | Data pipeline, simulation, live trading, HITL supervision |
 | Phase 5 | 🟡 In Progress | Maker strategy: dynamic spread, inventory management, cancel-replace loop |
-| Phase 2.5 | 📋 Research | **Quant Desk Simulation Upgrade**: Agent-Based Simulation (Zero-Intelligence Agents), Brier Score calibration metric, Sequential Monte Carlo (Particle Filter), GBM + Jump Diffusion price generation |
-| Phase 6 | ⏳ Up Next | Frontend modularization (ES Modules, state management) |
+| Phase 2.5 | 📋 Research | **Quant Desk Simulation Upgrade**: Agent-Based Simulation (Zero-Intelligence Agents), Brier Score calibration metric, Sequential Monte Carlo (Particle Filter) |
+| Phase 6 | ✅ Complete | Frontend modularization (React 18 / Vite component architecture) |
 | Phase 7 | ✅ Complete | Testing framework (122 unit tests), Config Validator (fail-fast) |
 | Phase 8 | ✅ Complete | Simulation fidelity: Fill Model Hardening, CLOB queue-position simulation |
 | Future | 📋 Planned | Sub-100ms HFT event loop, multi-exchange adapter (Predict.fun) |
@@ -273,5 +277,4 @@ This showcase repository contains selected architectural components for demonstr
 The full trading system is maintained in a private repository.
 
 © 2026 CheeseDog (PolyCheese Quant)
-
 
