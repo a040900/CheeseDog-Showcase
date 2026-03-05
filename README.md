@@ -267,7 +267,7 @@ Real-time monitoring dashboard featuring:
 | Phase 8 | ✅ Complete | Simulation fidelity: Fill Model Hardening, CLOB queue-position simulation |
 | Future | 📋 Planned | Sub-100ms HFT event loop, multi-exchange adapter (Predict.fun) |
 
-> Phase 2.5 is planned after Phase 5 Maker strategy validation. See [`docs/SystemDesign.md`](docs/SystemDesign.md) for the full research design.
+> Phase 2.5 is planned after Phase 5 Maker strategy validation. See [`docs/SystemDesign.md`](docs/SystemDesign.pdf) for the full research design.
 
 ---
 
@@ -277,6 +277,7 @@ This showcase repository contains selected architectural components for demonstr
 The full trading system is maintained in a private repository.
 
 © 2026 CheeseDog (PolyCheese Quant)
+
 
 
 
