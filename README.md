@@ -232,7 +232,7 @@ See the [`examples/`](examples/) directory for safe-to-share architectural compo
 
 ## Dashboard
 
-![Dashboard Overview](screenshots/dashboard_overview.png)
+![Dashboard Overview](assets/dashboard_v2_ai.png)
 
 Real-time monitoring dashboard featuring:
 - 18+ live market indicators with WebSocket push updates
@@ -277,5 +277,6 @@ This showcase repository contains selected architectural components for demonstr
 The full trading system is maintained in a private repository.
 
 © 2026 CheeseDog (PolyCheese Quant)
+
 
 
