@@ -10,6 +10,14 @@
 
 CheeseDog is a **full-stack quant trading terminal** that fuses multi-source real-time data with both **directional prediction (Taker)** and **market-making (Maker/Liquidity Provision)** strategies.
 
+### Hybrid Quant-AI Architecture (The Hybrid Moat)
+
+CheeseDog employs a proprietary dual-layer engine designed to survive and thrive during extreme market volatility:
+1. **Macro Sentiment Radar (The Brain):** An autonomous AI Agent continuously scans unstructured data (e.g., global news, crypto Twitter) to detect impending macroeconomic shifts (like CPI releases).
+2. **Bayesian Risk Engine (The Body):** Traditional indicators often fail during black-swan events. Instead of letting AI blindly authorize trades, our AI passes a `macro_regime` state to the backend. The core system then utilizes a **2D Bayesian Learning Matrix** to dynamically discount confidence scores and widen spread execution based on historical hit rates during similar volatile periods. 
+
+*Result:* The system provides consistent liquidity during normal conditions but instantly transitions into a defensive, highly selective institutional market-making stance during real-world crises.
+
 ### Core Design Principles
 
 | Principle | Implementation |
@@ -27,7 +35,7 @@ CheeseDog is a **full-stack quant trading terminal** that fuses multi-source rea
 ### Backend (Python 3.11)
 - **Framework**: FastAPI + Uvicorn (async)
 - **Event System**: Custom MessageBus (asyncio Queue, 50K event capacity)
-- **Trading SDK**: `py-clob-client` (Polymarket official)
+- **Trading SDK**: `py-clob-client` & `@polymarket/builder-signing-sdk` (Order Attribution compliant)
 - **Data Sources**: Binance WebSocket, Polymarket CLOB REST/WS (L2, 99 levels), Chainlink Oracle (Polygon RPC)
 - **Database**: SQLite (trade history, maker order tracking, performance metrics)
 - **Backtesting**: Pandas + PyArrow (Parquet streaming, Wind Tunnel engine with Grid Search)
@@ -48,33 +56,33 @@ CheeseDog is a **full-stack quant trading terminal** that fuses multi-source rea
 ## Data Pipeline
 
 ```
-┌───────────────────┐     ┌───────────────────┐     ┌───────────────────┐
-│  Binance          │     │  Polymarket       │     │  Chainlink        │
-│  WebSocket        │     │  CLOB API         │     │  Oracle           │
-│  ───────────────  │     │  ───────────────  │     │  ───────────────  │
-│  • BTC Trades     │     │  • L2 Orderbook   │     │  • BTC/USD Price  │
-│  • 1m Klines      │     │  • Contract Prices│     │  • On-chain feed  │
-│  • Order Book     │     │  • Spreads        │     │  • Polygon RPC    │
-│  (20 levels)      │     │  (99 levels)      │     │  (persistent TCP) │
-└─────────┬─────────┘     └────────┬──────────┘     └─────────┬─────────┘
-          │                        │                         │
-          └────────────────────────┼─────────────────────────┘
-                                   │
-                     ┌─────────────▼──────────────┐
-                     │       MessageBus           │
-                     │   (Pub/Sub Event System)   │
-                     │   50,000 event queue       │
-                     └─────────────┬──────────────┘
-                                   │
-               ┌───────────────────┼───────────────────┐
-               │                   │                    │
-    ┌──────────▼──────┐  ┌────────▼───────┐  ┌────────▼───────┐
-    │  Signal Engine  │  │  Risk Manager  │  │  Smart Router  │
-    │  ────────────── │  │  ────────────  │  │  ────────────  │
-    │  12+ indicators │  │  4 circuit     │  │  Taker (FOK)   │
-    │  Bayesian cal.  │  │  breakers      │  │  Maker (GTC)   │
-    │  Sentiment      │  │  Kelly sizing  │  │  EV Filter     │
-    └─────────────────┘  └────────────────┘  └────────────────┘
+┌──────────────────┐     ┌───────────────────┐     ┌───────────────────┐
+│  Binance         │     │  Polymarket       │     │  Chainlink        │
+│  WebSocket       │     │  CLOB API         │     │  Oracle           │
+│  ─────────────── │     │  ───────────────  │     │  ───────────────  │
+│  • BTC Trades    │     │  • L2 Orderbook   │     │  • BTC/USD Price  │
+│  • 1m Klines     │     │  • Contract Prices│     │  • On-chain feed  │
+│  • Order Book    │     │  • Spreads        │     │  • Polygon RPC    │
+│  (20 levels)     │     │  (99 levels)      │     │  (persistent TCP) │
+└────────┬─────────┘     └────────┬──────────┘     └────────┬──────────┘
+         │                        │                         │
+         └────────────────────────┼─────────────────────────┘
+                                  │
+                    ┌─────────────▼───────────────┐
+                    │       MessageBus            │
+                    │   (Pub/Sub Event System)    │
+                    │   50,000 event queue        │
+                    └─────────────┬───────────────┘
+                                  │
+              ┌───────────────────┼────────────────────┐
+              │                   │                    │
+    ┌─────────▼───────┐  ┌────────▼───────┐  ┌────────▼──────┐
+    │  Signal Engine  │  │  Risk Manager  │  │  Smart Router │
+    │  ────────────── │  │  ────────────  │  │  ──────────── │
+    │  12+ indicators │  │  4 circuit     │  │  Taker (FOK)  │
+    │  Bayesian cal.  │  │  breakers      │  │  Maker (GTC)  │
+    │  Sentiment      │  │  Kelly sizing  │  │  EV Filter    │
+    └─────────────────┘  └────────────────┘  └───────────────┘
 ```
 
 ---
@@ -84,7 +92,7 @@ CheeseDog is a **full-stack quant trading terminal** that fuses multi-source rea
 The composite signal generator fuses **12+ technical indicators** into a single normalized bias score:
 
 | Category | Indicators |
-|----------|-----------| 
+|----------|------------| 
 | **Trend** | EMA Crossover (5/20), Heikin-Ashi Candle Patterns, MACD Histogram |
 | **Momentum** | RSI (14), Bollinger Bands %B |
 | **Volume** | CVD (1m/3m/5m), Volume Profile POC |
@@ -142,12 +150,21 @@ This prevents the most dangerous backtest-to-live performance gap in prediction 
 
 Implements Polymarket's **exact quadratic fee formula** for 15-minute crypto markets:
 
-| Side | Fee Range | Deducted From |
-|------|----------|---------------|
+| Side | Fee Range | Deducted From  |
+|------|-----------|----------------|
 | Buy  | 0.2% – 1.6% | Token amount |
-| Sell | 0.8% – 3.7% | USDC proceeds |
+| Sell | 0.8% – 3.7% | USDC proceeds|
 
 Fee rate scales with contract price deviation from 0.50 (most liquid point). Critical edge case: settlement at $1.00 means the sell-side fee calculation must use `contract_price=1.0`, not the entry price — which changes the fee by up to 3×. See [`examples/fee_model.py`](examples/fee_model.py).
+
+---
+
+## Polymarket Builder Compliance
+
+CheeseDog architecture strictly adheres to the official **Builder Program** requirements:
+- **Order Attribution:** Integrated `@polymarket/builder-signing-sdk` via `ClobClient` initialization parameters. All proprietary trades automatically transmit the `POLY_BUILDER_API_KEY`, `POLY_BUILDER_SIGNATURE`, `POLY_BUILDER_TIMESTAMP`, and `POLY_BUILDER_PASSPHRASE` headers for volume tracking.
+- **Account Tiers Awareness:** Dynamically adjusts Token Bucket parameters in the API Rate Limiter based on whether the account is Verified (3000 tx/day) or Unverified (100 tx/day).
+- **Zero End-User Exposure:** This is a proprietary algorithmic infrastructure (Own Funds only). It contains no end-user facing connection (like wallet connect interfaces) and is designed solely for isolated, independent strategy execution.
 
 ---
 
@@ -169,12 +186,12 @@ Fee rate scales with contract price deviation from 0.50 (most liquid point). Cri
 │                  Rate Guard Pipeline                 │
 │                                                      │
 │   Market Move?                Token Available?       │
-│   ┌────────────┐     YES     ┌──────────────┐        │
-│   │ Deadband   │───────────▸ │ Token Bucket │──▸ API │
-│   │ Filter     │             │ Rate Limiter │        │
-│   │ Δ < 2%?    │     NO      │ N tx/min     │        │
-│   │ → SKIP     │──── ✗       │ burst: 10    │       │
-│   └────────────┘             └──────────────┘        │
+│   ┌───────────┐     YES     ┌──────────────┐         │
+│   │ Deadband  │───────────▸│ Token Bucket  │──▸ API  │
+│   │ Filter    │            │ Rate Limiter  │         │
+│   │ Δ < 2%?   │     NO     │ N tx/min      │         │
+│   │ → SKIP    │──── ✗      │ burst: 10    │          │
+│   └───────────┘             └──────────────┘         │
 │                                                      │
 │   Layer 1: Skip if market     Layer 2: Hard rate     │
 │   hasn't moved enough         cap enforcement        │
@@ -232,7 +249,7 @@ See the [`examples/`](examples/) directory for safe-to-share architectural compo
 
 ## Dashboard
 
-![Dashboard Overview](assets/dashboard_v2_ai.png)
+![Dashboard Overview](screenshots/dashboard_overview.png)
 
 Real-time monitoring dashboard featuring:
 - 18+ live market indicators with WebSocket push updates
@@ -267,7 +284,7 @@ Real-time monitoring dashboard featuring:
 | Phase 8 | ✅ Complete | Simulation fidelity: Fill Model Hardening, CLOB queue-position simulation |
 | Future | 📋 Planned | Sub-100ms HFT event loop, multi-exchange adapter (Predict.fun) |
 
-> Phase 2.5 is planned after Phase 5 Maker strategy validation. See [`docs/SystemDesign.pdf`](docs/SystemDesign.pdf) for the full research design.
+> Phase 2.5 is planned after Phase 5 Maker strategy validation. See [`docs/SystemDesign.md`](docs/SystemDesign.md) for the full research design.
 
 ---
 
@@ -277,8 +294,4 @@ This showcase repository contains selected architectural components for demonstr
 The full trading system is maintained in a private repository.
 
 © 2026 CheeseDog (PolyCheese Quant)
-
-
-
-
 
